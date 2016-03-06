@@ -45,7 +45,7 @@ router.post('/:token', function(req, res) {
      * Validate mandatory fields
      */
     if (storeId == null || upc == null || epc == null || tid == null ||
-        ts == null || printerId == null || user == null) {
+        ts == null || printerId == null || userId == null) {
         res.status(400).send({ "error" : "All fields (storeId, upc, epc, tid, ts, userId & printerId) are mandatory" });
         return;
     }
