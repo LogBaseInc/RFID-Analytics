@@ -25,11 +25,11 @@ router.post('/:token', function(req, res) {
     var item_list = [];
 
     if (token != secret_key) {
-        res.status(400).send("Invalid request. Token Mismatched")
+        res.status(400).send({ "error" : "Invalid request. Token Mismatched" })
     }
 
     if (data.length == 0) {
-        res.status(400).send("Invalid request. No products provided")
+        res.status(400).send({ "error" : "Invalid request. No products provided" })
         return;
     }
 
@@ -38,12 +38,15 @@ router.post('/:token', function(req, res) {
     var epc = data.epc;
     var tid = data.tid;
     var ts = data.ts;
+    var printerId = data.printerId;
+    var userId = data.userId;
 
     /*
      * Validate mandatory fields
      */
-    if (storeId == null || upc == null || epc == null || tid == null || ts == null) {
-        res.status(400).send("All fields (storeId, upc, epc, tid & ts) are mandatory");
+    if (storeId == null || upc == null || epc == null || tid == null ||
+        ts == null || printerId == null || user == null) {
+        res.status(400).send({ "error" : "All fields (storeId, upc, epc, tid, ts, userId & printerId) are mandatory" });
         return;
     }
 
@@ -55,7 +58,9 @@ router.post('/:token', function(req, res) {
         epc: { 'S': epc },
         upc: { 'S': upc },
         tid: { 'S': tid },
-        ts: { 'S': ts}
+        ts: { 'S': ts},
+        printerId: {'S': printerId},
+        userId: {'S': userId}
     }
 
     var put_request = {
@@ -82,7 +87,7 @@ function batchWrite(product_list, complete, res) {
     dynamodb.batchWriteItem(params, function(err, data) {
         if (err) {
             console.log(err);
-            res.status(400).send(err.message);
+            res.status(400).send({ "error" : err.message });
             return;
         } else {
             if (complete) {
