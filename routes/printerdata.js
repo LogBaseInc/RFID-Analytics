@@ -26,10 +26,6 @@ router.post('/:token', function(req, res) {
 
     if (token != secret_key) {
         res.status(400).send({ "error" : "Invalid request. Token Mismatched" })
-    }
-
-    if (data.length == 0) {
-        res.status(400).send({ "error" : "Invalid request. No products provided" })
         return;
     }
 
