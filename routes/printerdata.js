@@ -72,6 +72,7 @@ router.post('/:token', function(req, res) {
     }
 
     item_list.push(list_items);
+    client.log(item_list, ["info"])
     batchWrite(item_list, true, res);
 });
 
