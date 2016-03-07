@@ -73,6 +73,7 @@ function processItems(items, tableName, res) {
         var x = items[idx].x;
         var y = items[idx].y;
         var z = items[idx].z;
+        var region = items[idx].region;
         var storeId = items[idx].storeId;
 
         console.log(auditId, source, epc, ts, location, gtin, group, x, y, z, storeId, idx);
@@ -106,7 +107,8 @@ function processItems(items, tableName, res) {
             x: { 'S': x },
             y: { 'S': y },
             z: { 'S': z },
-            storeId: { 'S': storeId }
+            storeId: { 'S': storeId },
+            region: {'S' : region}
         }
 
         var put_request = {
