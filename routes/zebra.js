@@ -1,6 +1,7 @@
 var express = require('express');
 var router = express.Router();
 var utils = require('./utils.js');
+require("datejs");
 
 var AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
@@ -75,8 +76,14 @@ function processItems(items, tableName, res) {
         var z = items[idx].z;
         var region = items[idx].region;
         var storeId = items[idx].storeId;
+        var partitionKey = storeId;
+        var upc = utils.EPC2UPC(epc);
 
-        console.log(auditId, source, epc, ts, location, gtin, group, x, y, z, storeId, idx);
+        var parseDate = Date.parse(ts);
+        if (parseDate != null || parseDate != undefined) {
+            partitionKey = storeId + "##" + Date.parse(ts).toString("yyyy-MM-dd");
+        }
+
         /*
          * Validate mandatory fields
          */
@@ -108,7 +115,9 @@ function processItems(items, tableName, res) {
             y: { 'S': y },
             z: { 'S': z },
             storeId: { 'S': storeId },
-            region: {'S' : region}
+            region: {'S' : region},
+            upc: {'S' : upc},
+            partitionKey: {'S' : partitionKey}
         }
 
         var put_request = {
@@ -120,6 +129,7 @@ function processItems(items, tableName, res) {
         }
 
         item_list.push(list_items);
+        //console.log(item_details);
 
         if (idx == items.length - 1) {
             utils.batchWrite(item_list, true, res, tableName);
