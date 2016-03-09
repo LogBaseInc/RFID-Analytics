@@ -1,5 +1,7 @@
 var express = require('express');
 var router = express.Router();
+var utils = require("./utils.js")
+require("datejs");
 
 var AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
@@ -36,6 +38,12 @@ router.post('/:token', function(req, res) {
     var ts = data.ts;
     var printerId = data.printerId;
     var userId = data.userId;
+    var partitionKey = storeId;
+
+    var parseDate = Date.parse(ts);
+    if (parseDate != null || parseDate != undefined) {
+        partitionKey = storeId + "##" + Date.parse(ts).toString("yyyy-MM-dd");
+    }
 
     /*
      * Validate mandatory fields
@@ -56,7 +64,8 @@ router.post('/:token', function(req, res) {
         tid: { 'S': tid },
         ts: { 'S': ts},
         printerId: {'S': printerId},
-        userId: {'S': userId}
+        userId: {'S': userId},
+        partitionKey: {'S' : partitionKey}
     }
 
     var put_request = {
