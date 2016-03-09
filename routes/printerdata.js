@@ -5,7 +5,7 @@ require("datejs");
 
 var AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
-var PRINTER_DATA_TABLE_NAME = "PrinterData";
+var PRINTER_DATA_TABLE_NAME = "RFID-Printer-Data";
 var dynamodb = new AWS.DynamoDB({apiVersion: 'latest'});
 
 var loggly = require('loggly');
