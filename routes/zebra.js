@@ -77,21 +77,24 @@ function processItems(items, tableName, res) {
         var region = items[idx].region;
         var storeId = items[idx].storeId;
         var partitionKey = storeId;
-        var upc = utils.EPC2UPC(epc);
-
-        var parseDate = Date.parse(ts);
-        if (parseDate != null || parseDate != undefined) {
-            partitionKey = storeId + "##" + Date.parse(ts).toString("yyyy-MM-dd");
-        }
 
         /*
          * Validate mandatory fields
          */
         if (auditId == null || source == null || epc == null || ts == null || location == null ||
-            gtin == null || group == null || x == null || y == null || z == null || storeId == null) {
+            gtin == null || group == null || x == null || y == null || z == null ||
+            storeId == null || region == null) {
             res.status(400).send({ "error" : "All fields (auditId, source, epc, ts, " +
                 "location, gtin, group, x, y, z, storeId) are mandatory"});
             return;
+        }
+
+
+        var upc = utils.EPC2UPC(epc);
+
+        var parseDate = Date.parse(ts);
+        if (parseDate != null || parseDate != undefined) {
+            partitionKey = storeId + "##" + Date.parse(ts).toString("yyyy-MM-dd");
         }
 
         if (tableName == ZEBRA_DATA_TABLE_NAME && source.indexOf("smart sensing") < 0 ||
@@ -133,9 +136,10 @@ function processItems(items, tableName, res) {
 
         if (idx == items.length - 1) {
             utils.batchWrite(item_list, true, res, tableName);
+            item_list = [];
         }
 
-        if (item_list.size == utils.getDynamoDBBatchWriteLimit()) {
+        if (item_list.length == utils.getDynamoDBBatchWriteLimit()) {
             utils.batchWrite(item_list, false, res, tableName);
             item_list = [];
         }

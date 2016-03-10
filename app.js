@@ -21,9 +21,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 var printerData = require('./routes/printerdata');
 var zebra = require('./routes/zebra');
+var prenote = require('./routes/prenote');
 
 app.use('/printerdata', printerData);
 app.use('/zebra', zebra);
+app.use('/prenote', prenote);
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
