@@ -19,6 +19,13 @@ app.use(bodyParser.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
+app.use(function(req, res, next) {
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE");
+    next();
+});
+
 var printerData = require('./routes/printerdata');
 var zebra = require('./routes/zebra');
 var prenote = require('./routes/prenote');
@@ -26,14 +33,6 @@ var prenote = require('./routes/prenote');
 app.use('/printerdata', printerData);
 app.use('/zebra', zebra);
 app.use('/prenote', prenote);
-
-
-app.use(function(req, res, next) {
-    res.header("Access-Control-Allow-Origin", "*");
-    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-    res.header("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE");
-    next();
-});
 
 // catch 404 and forward to error handler
 app.use(function(req, res, next) {
