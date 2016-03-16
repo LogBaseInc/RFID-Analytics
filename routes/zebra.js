@@ -2,6 +2,10 @@ var express = require('express');
 var router = express.Router();
 var utils = require('./utils.js');
 require("datejs");
+var multer  = require('multer');
+var upload = multer({dest: 'uploads/'});
+var fs = require('fs');
+var readline = require('readline');
 
 var AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
@@ -20,47 +24,96 @@ var client = loggly.createClient({
     json:true
 });
 
-/* Upload zebra smart sense data. */
-router.post('/ss/:token', function(req, res) {
+function processfile(req, res, type) {
     var token = req.params.token || " ";
-    var items = req.body;
-
     if (utils.validateSecret(token) != true) {
         res.status(400).send({ "error": "Invalid request. Token mismatched" });
         return;
     }
-
-    if (items.length == 0) {
-        res.status(400).send({ "error": "Invalid request. No entries provided" });
+    else if(req.file == null || req.file == undefined) {
+        res.status(400).send({ "error": "Invalid request. No file found"  });
         return;
     }
 
-    processItems(items, ZEBRA_DATA_TABLE_NAME, res);
+    res.status(200).send();
+
+    var rd = readline.createInterface({
+        input: fs.createReadStream(req.file.path),
+        output: process.stdout,
+        terminal: false
+    });
+
+    var storeidpresent = null;
+    var auditIdIndex = 0;
+    var values = [];
+
+    rd.on('line', function(line) {
+        if(line.lastIndexOf(",") != (line.length-1)) {
+            var linesplit = line.split(",");
+            if(linesplit.length >= 11) {
+                if(storeidpresent == null) {
+                    if(linesplit[0].toLowerCase().indexOf("store") >=0 ) {
+                        storeidpresent = true;
+                        auditIdIndex = 1;
+                    }
+                    else {
+                        storeidpresent = false;
+                        auditIdIndex = 0;
+                    }
+                } else {
+                    values.push({
+                        storeId : storeidpresent ? linesplit[0].toString() : "373",
+                        auditId : linesplit[auditIdIndex].toString(),
+                        source : linesplit[auditIdIndex+1].toString(),
+                        epc : linesplit[auditIdIndex+2].toString(),
+                        ts : linesplit[auditIdIndex+3].toString(),
+                        location : linesplit[auditIdIndex+4].toString(),
+                        gtin : linesplit[auditIdIndex+5].toString(),
+                        group : linesplit[auditIdIndex+6].toString(),
+                        x : linesplit[auditIdIndex+7].toString(),
+                        y : linesplit[auditIdIndex+8].toString(),
+                        z : linesplit[auditIdIndex+9].toString(),
+                        region : linesplit[auditIdIndex+10].toString(),
+                    });
+                }
+
+            }
+        }
+    });
+
+    rd.on('close', function(data) {
+        if(values.length > 0) {
+            if(type == "SS") {
+               processItems(values, ZEBRA_DATA_TABLE_NAME, function(error){
+                    console.log(error);
+               }); 
+            }
+            else if(type == "HH") {
+                processItems(values, HANDHELD_DATA_TABLE_NAME, function(error){
+                    console.log(error);
+                });
+            }
+        }
+    });
+    return;
+}
+
+/* Upload zebra smart sense data. */
+router.post('/ss/:token', upload.single('file'), function(req, res) {
+    processfile(req, res, "SS");
 });
 
 /* Upload zebra hand held data. */
-router.post('/hh/:token', function(req, res) {
-    var token = req.params.token || " ";
-    var items = req.body;
+router.post('/hh/:token', upload.single('file'), function(req, res) {
+    console.log(req.file);
 
-    console.log(req.body);
-    if (utils.validateSecret(token) != true) {
-        res.status(400).send({ "error": "Invalid request. Token mismatched" });
-        return;
-    }
-
-    if (items.length == 0) {
-        res.status(400).send({ "error": "Invalid request. No entries provided" });
-        return;
-    }
-
-    processItems(items, HANDHELD_DATA_TABLE_NAME, res);
+    processfile(req, res, "HH");
 });
 
 module.exports = router;
 
 // Functions
-function processItems(items, tableName, res) {
+function processItems(items, tableName, callback) {
     var item_list = [];
 
     for (var idx in items) {
@@ -84,8 +137,7 @@ function processItems(items, tableName, res) {
         if (auditId == null || source == null || epc == null || ts == null || location == null ||
             gtin == null || group == null || x == null || y == null || z == null ||
             storeId == null || region == null) {
-            res.status(400).send({ "error" : "All fields (auditId, source, epc, ts, " +
-                "location, gtin, group, x, y, z, storeId) are mandatory"});
+            callback("All fields (auditId, source, epc, ts, " + "location, gtin, group, x, y, z, storeId) are mandatory");
             return;
         }
 
@@ -98,8 +150,8 @@ function processItems(items, tableName, res) {
         }
 
         if (tableName == ZEBRA_DATA_TABLE_NAME && source.indexOf("smart sensing") < 0 ||
-            tableName == HANDHELD_DATA_TABLE_NAME && source.indexOf("handheld") <=0) {
-            res.status(400).send({ "error" : "Invalid value for source - " + source})
+            tableName == HANDHELD_DATA_TABLE_NAME && source.indexOf("handheld") < 0) {
+            callback("Invalid value for source - "+source);
             return;
         }
 
@@ -135,12 +187,12 @@ function processItems(items, tableName, res) {
         //console.log(item_details);
 
         if (idx == items.length - 1) {
-            utils.batchWrite(item_list, true, res, tableName);
+            utils.batchWrite(item_list, true, callback, tableName);
             item_list = [];
         }
 
         if (item_list.length == utils.getDynamoDBBatchWriteLimit()) {
-            utils.batchWrite(item_list, false, res, tableName);
+            utils.batchWrite(item_list, false, callback, tableName);
             item_list = [];
         }
     }

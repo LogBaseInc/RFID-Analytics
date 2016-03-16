@@ -2,6 +2,10 @@ var express = require('express');
 var router = express.Router();
 var utils = require('./utils.js');
 require("datejs");
+var multer  = require('multer');
+var upload = multer({dest: 'uploads/'});
+var fs = require('fs');
+var readline = require('readline');
 
 var AWS = require('aws-sdk');
 AWS.config.update({region: 'us-east-1'});
@@ -20,27 +24,63 @@ var client = loggly.createClient({
 });
 
 /* Upload pre-note data. */
-router.post('/:token', function(req, res) {
+router.post('/:token', upload.single('file'), function(req, res) {
     var token = req.params.token || " ";
-    var items = req.body;
-
     if (utils.validateSecret(token) != true) {
         res.status(400).send({ "error": "Invalid request. Token mismatched" });
         return;
     }
-
-    if (items.length == 0) {
-        res.status(400).send({ "error": "Invalid request. No entries provided" });
+    else if(req.file == null || req.file == undefined) {
+        res.status(400).send({ "error": "Invalid request. No file found"  });
         return;
     }
 
-    processItems(items, PRENOTE_TABLE_NAME, res);
+    res.status(200).send();
+
+    var rd = readline.createInterface({
+        input: fs.createReadStream(req.file.path),
+        output: process.stdout,
+        terminal: false
+    });
+
+    var storeidpresent = null;
+    var auditIdIndex = 0;
+    var prenotevalues = [];
+
+    rd.on('line', function(line) {
+        if(line.lastIndexOf(",") != (line.length-1)) {
+            var linesplit = line.split(",");
+            if(linesplit.length == 10) {
+                prenotevalues.push({
+                    storeId : linesplit[0].toString(),
+                    upc : linesplit[1].toString(),
+                    itemNumber : linesplit[2].toString(),
+                    dept : linesplit[3].toString(),
+                    quantity : linesplit[4].toString(),
+                    loadId : linesplit[5].toString(),
+                    trailerId : linesplit[6].toString(),
+                    tripId : linesplit[7].toString(),
+                    shipmentId : linesplit[8].toString(),
+                    ts : linesplit[9].toString(),
+                });
+            }
+        }
+    });
+
+    rd.on('close', function(data) {
+        if(prenotevalues.length > 0) {
+           processItems(prenotevalues, PRENOTE_TABLE_NAME, function(error){
+                console.log(error);
+           }); 
+        }
+    });
+    return;
 });
 
 module.exports = router;
 
 // Functions
-function processItems(rawItems, tableName, res) {
+function processItems(rawItems, tableName, callback) {
     var item_list = [];
 
     var items = addSimilarItems(rawItems);
@@ -70,8 +110,7 @@ function processItems(rawItems, tableName, res) {
          */
         if (storeId == null || upc == null || itemNumber == null || dept == null || quantity == null ||
             loadId == null || trailerId == null || tripId == null || shipmentId == null || ts == null) {
-            res.status(400).send({ "error" : "All fields (storeId, upc, itemNumber, dept, quantity, loadId, " +
-                "trailerId, tripId, shipmentId, ts) are mandatory"});
+            callback("All fields (storeId, upc, itemNumber, dept, quantity, loadId, trailerId, tripId, shipmentId, ts) are mandatory");
             return;
         }
 
@@ -105,16 +144,14 @@ function processItems(rawItems, tableName, res) {
         //console.log(item_details);
 
         if (item_list.length == utils.getDynamoDBBatchWriteLimit()) {
-            utils.batchWrite(item_list, false, res, tableName);
+            utils.batchWrite(item_list, false, callback, tableName);
             item_list = [];
         }
     }
 
     if (item_list.length > 0) {
-        console.log(item_list)
-        utils.batchWrite(item_list, true, res, tableName);
+        utils.batchWrite(item_list, true, callback, tableName);
     } else {
-        res.status(200).send();
         return;
     }
 }
